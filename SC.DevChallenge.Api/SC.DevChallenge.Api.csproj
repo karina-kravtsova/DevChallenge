@@ -8,4 +8,14 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="5.6.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SC.DevChallenge.DataLayer\SC.DevChallenge.DataLayer.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Input\data.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
