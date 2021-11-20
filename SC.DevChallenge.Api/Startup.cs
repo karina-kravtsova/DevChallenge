@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using SC.DevChallenge.Api.Config;
 using SC.DevChallenge.DataLayer;
+using SC.DevChallenge.DataLayer.Db;
 
 namespace SC.DevChallenge.Api
 {
@@ -33,6 +35,8 @@ namespace SC.DevChallenge.Api
 
             services.AddSingleton<IDataReaderService, CsvReaderService>();
             services.AddScoped<IDataQueryService, DataQueryService>();
+
+            services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(Configuration.GetConnectionString("sqliteConn")));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
