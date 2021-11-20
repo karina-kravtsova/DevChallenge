@@ -37,6 +37,9 @@ namespace SC.DevChallenge.DataLayer.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("Price")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("TimeSlot")
                         .HasColumnType("INTEGER");
 

@@ -10,13 +10,21 @@ namespace SC.DevChallenge.DataLayer.Tables
         [Key]
         [Required]
         public Guid Id { get; set; }
+        
         [StringLength(50)]
         public string Portfolio { get; set; }
+        
         [StringLength(50)]
         public string Owner { get; set; }
+        
         [StringLength(50)]
+        
         public string Instrument { get; set; }
+
+        public decimal Price { get; set; }
+
         public DateTime Date { get; set; }
+        
         public int TimeSlot { get; set; }
     }
 }

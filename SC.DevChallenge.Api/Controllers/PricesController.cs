@@ -4,9 +4,14 @@ using Microsoft.Extensions.Options;
 using SC.DevChallenge.Api.Config;
 using SC.DevChallenge.Api.Dto;
 using SC.DevChallenge.DataLayer;
+using SC.DevChallenge.DataLayer.Db;
 using System;
+using System.Linq;
 using System.Globalization;
 using System.Threading.Tasks;
+using SC.DevChallenge.DataLayer.Tables;
+using SC.DevChallenge.DataLayer.Helpers;
+using SC.DevChallenge.DataLayer.Statistics;
 
 namespace SC.DevChallenge.Api.Controllers
 {
@@ -18,18 +23,22 @@ namespace SC.DevChallenge.Api.Controllers
         private readonly IDataQueryService _dataQueryService;
         private readonly IOptions<CsvConfig> _csvConfig;
         private readonly IWebHostEnvironment _env;
+        private readonly ApplicationDbContext _context;
         private readonly string csvPath;
 
         public PricesController(IDataReaderService dataReaderService, 
             IDataQueryService dataQueryService,
             IOptions<CsvConfig> csvConfig, 
-            IWebHostEnvironment env)
+            IWebHostEnvironment env,
+            ApplicationDbContext context)
         {
             _dataReaderService = dataReaderService;
             _dataQueryService = dataQueryService;
             _csvConfig = csvConfig;
             _env = env;
-            
+            _context = context;
+
+
             csvPath =  $"{_env.ContentRootPath}/{_csvConfig.Value.FilePath}";
         }
 
@@ -48,6 +57,44 @@ namespace SC.DevChallenge.Api.Controllers
 
             var response = new Result { date = result.TimeSlotDate, price = result.AvgPrice };
             return Ok(response);
+        }
+
+        [HttpGet("benchmark")]
+        public async Task<IActionResult> GetBenchmark(string portfolio, string date)
+        {
+            var dateTime = DateTime.ParseExact(date, _csvConfig.Value.DateFormat, CultureInfo.InvariantCulture);
+            var timeSlot = TimeIntervalService.DateToTimeSlot(dateTime);
+            
+            var selection = _context.FinanceInstruments
+                .Where(fi => fi.Portfolio == portfolio && fi.TimeSlot == timeSlot);
+
+            var benchmark = MathStats
+                .RemoveOutliers(selection.Select(s => s.Price))
+                .Average();
+
+            var response = new Result { date = TimeIntervalService.TimeSlotToDate(timeSlot), price = benchmark };
+            return Ok(response);
+        }
+
+        [HttpGet("initdb")]
+        public async Task InitDb()
+        {
+            var data = _dataReaderService.GetAll(csvPath, _csvConfig.Value.DateFormat);
+
+            var tableData = data.Select(d => new FinanceInstrument
+            {
+                Id = Guid.NewGuid(),
+                Portfolio = d.Portfolio,
+                Owner = d.Owner,
+                Instrument = d.Instrument,
+                Date = d.Date,
+                Price = d.Price,
+                TimeSlot = d.TimeSlot
+            });
+
+
+            _context.FinanceInstruments.AddRange(tableData);
+            _context.SaveChanges();
         }
     }
 }
