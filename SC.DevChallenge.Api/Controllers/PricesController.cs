@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using SC.DevChallenge.DataLayer.Tables;
 using SC.DevChallenge.DataLayer.Helpers;
 using SC.DevChallenge.DataLayer.Statistics;
+using System.Collections.Generic;
 
 namespace SC.DevChallenge.Api.Controllers
 {
@@ -68,6 +69,11 @@ namespace SC.DevChallenge.Api.Controllers
             var selection = _context.FinanceInstruments
                 .Where(fi => fi.Portfolio == portfolio && fi.TimeSlot == timeSlot);
 
+            if (!selection.Any())
+            {
+                return NotFound();
+            }
+
             var benchmark = MathStats
                 .RemoveOutliers(selection.Select(s => s.Price))
                 .Average();
@@ -75,6 +81,73 @@ namespace SC.DevChallenge.Api.Controllers
             var response = new Result { date = TimeIntervalService.TimeSlotToDate(timeSlot), price = benchmark };
             return Ok(response);
         }
+
+        [HttpGet("aggregate")]
+        public async Task<IActionResult> GetAggregated(string portfolio, string startdate, string enddate, int intervals)
+        {
+            var startDateTime = DateTime.ParseExact(startdate, _csvConfig.Value.DateFormat, CultureInfo.InvariantCulture);
+            var startTimeSlot = TimeIntervalService.DateToTimeSlot(startDateTime);
+
+            var endDateTime = DateTime.ParseExact(enddate, _csvConfig.Value.DateFormat, CultureInfo.InvariantCulture);
+            var endTimeSlot = TimeIntervalService.DateToTimeSlot(endDateTime);
+
+            // all timeslots
+            var timeSlots = endTimeSlot - startTimeSlot;
+
+            // timeslots in each group
+            var evenGroups = timeSlots / intervals;
+            
+            // incomplete timeslots group
+            var rest = timeSlots % intervals;
+
+
+            var timeSlotGroups = Enumerable.Range(startTimeSlot, timeSlots)
+                .Select((ts, i) => new { Index = i, Value = ts })
+                .GroupBy(x => x.Index / evenGroups)
+                .Select(x => x.Select(v => v.Value).ToList())
+                .ToList();
+
+            var completeGroups = timeSlotGroups.Take(intervals).ToList();
+            var incompleteGroupTimeSlots = timeSlotGroups.Skip(intervals)
+                .SelectMany(ts => ts)
+                .ToList();
+
+            // share incomplere group between complete groups
+            if (rest > 0)
+            {
+                for (int i = 0; i < incompleteGroupTimeSlots.Count; i++)
+                {
+                    var idx = i % completeGroups.Count;
+
+                    completeGroups[i].Add(incompleteGroupTimeSlots[i]);
+                }
+            }
+
+            var results = new List<Result>();
+
+            foreach (var group in completeGroups)
+            {
+                var groupData = _context.FinanceInstruments.Where(f => group.Contains(f.TimeSlot));
+                    
+                var benchmark = MathStats
+                            .RemoveOutliers(groupData.Select(s => s.Price))
+                            .Average();
+
+                var result = new Result
+                {
+                    date = TimeIntervalService.TimeSlotToDate(groupData.Max(d => d.TimeSlot)),
+                    price = benchmark
+                };
+
+                results.Add(result);
+            }
+
+            return Ok(results);
+        }
+
+
+
+
 
         [HttpGet("initdb")]
         public async Task InitDb()
